@@ -1,3 +1,4 @@
+import uuid
 import psycopg2
 import psycopg2.extras
 from contextlib import contextmanager
@@ -68,7 +69,6 @@ def get_client_by_whatsapp(whatsapp_number: str) -> dict | None:
 
 
 def create_client(whatsapp_number: str, name: str = None) -> dict:
-    import uuid
     client_id = str(uuid.uuid4())[:8]
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:

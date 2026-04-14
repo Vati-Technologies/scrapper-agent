@@ -1,3 +1,4 @@
+import os
 import httpx
 import mimetypes
 from config import WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID
@@ -34,27 +35,39 @@ def send_document(to: str, file_path: str, caption: str = ""):
 
 
 def _upload_media(file_path: str) -> str:
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Excel file not found: {file_path}")
     mime_type = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
-    with open(file_path, "rb") as f:
-        response = httpx.post(
-            f"{BASE_URL}/media",
-            headers={"Authorization": f"Bearer {WHATSAPP_TOKEN}"},
-            data={"messaging_product": "whatsapp"},
-            files={"file": (file_path.split("/")[-1], f, mime_type)},
-            timeout=60,
-        )
-    response.raise_for_status()
+    try:
+        with open(file_path, "rb") as f:
+            response = httpx.post(
+                f"{BASE_URL}/media",
+                headers={"Authorization": f"Bearer {WHATSAPP_TOKEN}"},
+                data={"messaging_product": "whatsapp"},
+                files={"file": (file_path.split("/")[-1], f, mime_type)},
+                timeout=60,
+            )
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise RuntimeError(
+            f"WhatsApp media upload failed ({e.response.status_code}): {e}"
+        ) from e
     return response.json()["id"]
 
 
 def _post(path: str, json: dict):
-    response = httpx.post(
-        f"{BASE_URL}{path}",
-        headers={**HEADERS, "Content-Type": "application/json"},
-        json=json,
-        timeout=30,
-    )
-    response.raise_for_status()
+    try:
+        response = httpx.post(
+            f"{BASE_URL}{path}",
+            headers={**HEADERS, "Content-Type": "application/json"},
+            json=json,
+            timeout=30,
+        )
+        response.raise_for_status()
+    except httpx.HTTPStatusError as e:
+        raise RuntimeError(
+            f"WhatsApp API error ({e.response.status_code}): {e}"
+        ) from e
     return response.json()
 
 
@@ -98,7 +111,7 @@ def parse_lead_request(text: str) -> dict | None:
     if not (industry and city):
         return None
 
-    result = {"industry": industry, "city": city, "star_min": None, "star_max": None}
+    result = {"industry": industry, "city": city}
 
     stars_raw = data.get("stars")
     if stars_raw:

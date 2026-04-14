@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 GOOGLE_PLACES_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY")
 
@@ -18,7 +18,7 @@ MIN_BUSINESSES = int(os.getenv("MIN_BUSINESSES", 10))
 
 # Validate required vars on startup
 REQUIRED = [
-    "GROQ_API_KEY",
+    "GEMINI_API_KEY",
     "SERPER_API_KEY",
     "GOOGLE_PLACES_API_KEY",
     "WHATSAPP_TOKEN",

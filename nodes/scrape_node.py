@@ -31,15 +31,18 @@ def _search_serper(query: str) -> list:
     places = data.get("places", [])
     businesses = []
     for place in places:
+        place_id = place.get("placeId", "")
+        if not place_id:
+            continue
         businesses.append({
-            "name": place.get("title", ""),
-            "address": place.get("address", ""),
-            "rating": place.get("rating"),
+            "name":         place.get("title", ""),
+            "address":      place.get("address", ""),
+            "rating":       place.get("rating"),
             "review_count": place.get("ratingCount", 0),
-            "place_id": place.get("placeId", ""),
-            "phone": place.get("phoneNumber", ""),
-            "website": place.get("website", ""),
-            "category": place.get("category", ""),
+            "place_id":     place_id,
+            "phone":        place.get("phoneNumber", ""),
+            "website":      place.get("website", ""),
+            "category":     place.get("category", ""),
         })
 
     return businesses

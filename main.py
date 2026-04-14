@@ -1,10 +1,11 @@
 import asyncio
+import logging
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import PlainTextResponse
 from concurrent.futures import ThreadPoolExecutor
 
 from config import WHATSAPP_VERIFY_TOKEN, validate_config
-from utils.db import run_migrations, get_client_by_whatsapp, create_client, has_used_daily_request, save_request
+from utils.db import run_migrations, get_client_by_whatsapp, create_client, has_used_daily_request, save_request, mark_request_failed
 from utils.whatsapp import (
     parse_incoming,
     parse_lead_request,
@@ -15,6 +16,8 @@ from utils.whatsapp import (
     PROCESSING_MSG,
 )
 from pipeline import run_pipeline
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="LeadGen Pro")
 executor = ThreadPoolExecutor(max_workers=4)
@@ -44,7 +47,10 @@ async def verify_webhook(request: Request):
 
 @app.post("/webhook")
 async def receive_message(request: Request):
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception:
+        return {"status": "ok"}
 
     # Ignore status updates
     try:
@@ -98,18 +104,19 @@ async def receive_message(request: Request):
     send_message(sender, PROCESSING_MSG.format(industry=industry, city=city, stars_label=stars_label))
 
     # ── Run pipeline in background (non-blocking) ──────────────────────────
+    def _run_pipeline_safe():
+        try:
+            run_pipeline(client_id, sender, industry, city, request_id, star_min, star_max)
+        except Exception as e:
+            logger.error("Pipeline failed for %s: %s: %s", sender, type(e).__name__, e)
+            try:
+                mark_request_failed(request_id)
+                send_message(sender, "⚠️ Something went wrong generating your report. Please try again.")
+            except Exception:
+                pass
+
     loop = asyncio.get_event_loop()
-    loop.run_in_executor(
-        executor,
-        run_pipeline,
-        client_id,
-        sender,
-        industry,
-        city,
-        request_id,
-        star_min,
-        star_max,
-    )
+    loop.run_in_executor(executor, _run_pipeline_safe)
 
     return {"status": "ok"}
 

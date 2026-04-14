@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import date
 from openpyxl import Workbook
 from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
@@ -17,16 +18,16 @@ THIN_BORDER = Border(
 )
 
 COLUMNS = [
-    ("Lead Status",     15),
-    ("Business Name",   30),
-    ("Category",        20),
-    ("Total Reviews",   14),
-    ("Phone Number",    18),
-    ("Website",         30),
-    ("Address",         35),
-    ("Star Rating",     12),
-    ("Review Summary",  55),
-    ("Raw Reviews",     60),
+    ("Lead Status",          15),
+    ("Business Name",        30),
+    ("Category",             20),
+    ("Total Reviews",        14),
+    ("Phone Number",         18),
+    ("Website",              30),
+    ("Address",              35),
+    ("Star Rating",          12),
+    ("Customers Praise",     55),
+    ("Customers Complaints", 55),
 ]
 
 
@@ -69,12 +70,6 @@ def excel_node(state: dict) -> dict:
         score = b.get("score", "WARM")
         label = "🔴 HOT" if score == "HOT" else "🟡 WARM"
 
-        raw_reviews = "\n\n".join(
-            f"[{r.get('rating')}★] {r.get('text', '')}"
-            for r in b.get("reviews", [])
-            if r.get("text")
-        ) or "No reviews."
-
         row_data = [
             label,
             b.get("name", ""),
@@ -84,8 +79,8 @@ def excel_node(state: dict) -> dict:
             b.get("website", "None"),
             b.get("address", ""),
             b.get("rating", "N/A"),
-            b.get("summary", ""),
-            raw_reviews,
+            b.get("praise", ""),
+            b.get("complaints", ""),
         ]
 
         for col_idx, value in enumerate(row_data, start=1):
@@ -100,8 +95,13 @@ def excel_node(state: dict) -> dict:
 
     # ── Save ──────────────────────────────────────────────────────────────
     os.makedirs("output", exist_ok=True)
-    filename = f"output/leads_{industry.lower().replace(' ', '_')}_{city.lower().replace(' ', '_')}_{date.today()}.xlsx"
-    wb.save(filename)
+    safe_industry = re.sub(r"[^\w\-]", "_", industry.lower())
+    safe_city     = re.sub(r"[^\w\-]", "_", city.lower())
+    filename = f"output/leads_{safe_industry}_{safe_city}_{date.today()}.xlsx"
+    try:
+        wb.save(filename)
+    except OSError as e:
+        raise RuntimeError(f"Failed to save Excel file '{filename}': {e}") from e
     print(f"📊 Excel saved: {filename}")
 
     return {"excel_path": filename}

@@ -1,21 +1,23 @@
+import re
+import json
 import threading
 import concurrent.futures
-from groq import Groq
-from config import GROQ_API_KEY
+from google import genai
+from config import GEMINI_API_KEY
 
-_MODEL_NAME = "llama-3.3-70b-versatile"
+_MODEL_NAME = "gemini-1.5-flash"
 _local = threading.local()
 
 
 def _get_client():
-    """Return a thread-local Groq client so threads don't share one instance."""
+    """Return a thread-local Gemini client so threads don't share one instance."""
     if not hasattr(_local, "client"):
-        _local.client = Groq(api_key=GROQ_API_KEY)
+        _local.client = genai.Client(api_key=GEMINI_API_KEY)
     return _local.client
 
 
 def analyze_node(state: dict) -> dict:
-    """Score each business and summarise its reviews with Groq/Llama."""
+    """Score each business and summarise its reviews with Gemini."""
     businesses = state["new_businesses"]
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
@@ -66,7 +68,21 @@ def _calculate_score(business: dict) -> tuple[str, str, int]:
     return score, reason, points
 
 
-# ── Groq review summary ───────────────────────────────────────────────────────
+# ── JSON parsing ──────────────────────────────────────────────────────────────
+
+def _parse_json_response(text: str) -> dict | None:
+    """Parse a JSON response, stripping markdown code fences if present."""
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?\s*", "", text)
+    text = re.sub(r"\s*```$", "", text)
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+
+# ── Gemini review summary ─────────────────────────────────────────────────────
 
 def _analyze_business(business: dict) -> dict:
     score, reason, points = _calculate_score(business)
@@ -77,10 +93,11 @@ def _analyze_business(business: dict) -> dict:
         print(f"ℹ️ No review text for '{business.get('name')}' — skipping summary.")
         return {
             **business,
-            "summary": "No reviews available.",
-            "score":   score,
-            "reason":  reason,
-            "points":  points,
+            "praise":     "No reviews available.",
+            "complaints": "No reviews available.",
+            "score":      score,
+            "reason":     reason,
+            "points":     points,
         }
 
     review_text = "\n".join(
@@ -88,30 +105,38 @@ def _analyze_business(business: dict) -> dict:
     )
 
     prompt = (
-        f"Summarise these customer reviews for {business.get('name', 'this business')} "
-        f"(rated {business.get('rating', 'N/A')}★) in 2-3 sentences. "
-        f"Cover what customers consistently praise and what they complain about. "
-        f"Be specific and factual. Write only the summary paragraph, no headers.\n\n"
+        f"Analyse these customer reviews for {business.get('name', 'this business')} "
+        f"(rated {business.get('rating', 'N/A')}★). "
+        f"Return ONLY a JSON object with exactly two keys:\n"
+        f"  \"praise\":     1-2 sentences on what customers consistently praise.\n"
+        f"  \"complaints\": 1-2 sentences on what customers consistently complain about.\n"
+        f"No markdown, no extra keys, no explanation.\n\n"
         f"Reviews:\n{review_text}"
     )
 
+    praise     = "Unable to analyze reviews."
+    complaints = "Unable to analyze reviews."
+
     try:
-        response = _get_client().chat.completions.create(
+        response = _get_client().models.generate_content(
             model=_MODEL_NAME,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
-            temperature=0.3,
+            contents=prompt,
         )
-        summary = response.choices[0].message.content.strip()
-        print(f"✅ Summary for '{business.get('name')}': OK")
+        parsed = _parse_json_response(response.text)
+        if parsed and "praise" in parsed and "complaints" in parsed:
+            praise     = parsed["praise"]
+            complaints = parsed["complaints"]
+            print(f"✅ Analysis for '{business.get('name')}': OK")
+        else:
+            print(f"⚠️ Unexpected Gemini response for '{business.get('name')}': {response.text[:100]}")
     except Exception as e:
-        print(f"⚠️ Groq error for '{business.get('name')}': {type(e).__name__}: {e}")
-        summary = "Unable to summarise reviews."
+        print(f"⚠️ Gemini error for '{business.get('name')}': {type(e).__name__}: {e}")
 
     return {
         **business,
-        "summary": summary,
-        "score":   score,
-        "reason":  reason,
-        "points":  points,
+        "praise":     praise,
+        "complaints": complaints,
+        "score":      score,
+        "reason":     reason,
+        "points":     points,
     }
