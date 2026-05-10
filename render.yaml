@@ -19,3 +19,7 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
+      - key: DASHBOARD_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

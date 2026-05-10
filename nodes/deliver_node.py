@@ -17,24 +17,25 @@ def deliver_node(state: dict) -> dict:
     warm_leads = [b for b in businesses if b.get("score") == "WARM"]
     total      = len(businesses)
 
-    # ── Build summary message ─────────────────────────────────────────────
-    summary = _build_summary(industry, city, hot_leads, warm_leads, total)
-    try:
-        send_message(whatsapp_no, summary)
-    except Exception as e:
-        print(f"❌ WhatsApp message failed for {whatsapp_no}: {type(e).__name__}: {e}")
-        raise
+    if not state.get("skip_whatsapp", False):
+        # ── Build summary message ─────────────────────────────────────────
+        summary = _build_summary(industry, city, hot_leads, warm_leads, total)
+        try:
+            send_message(whatsapp_no, summary)
+        except Exception as e:
+            print(f"❌ WhatsApp message failed for {whatsapp_no}: {type(e).__name__}: {e}")
+            raise
 
-    # ── Send Excel attachment ─────────────────────────────────────────────
-    try:
-        send_document(
-            whatsapp_no,
-            excel_path,
-            caption=f"📎 Full lead report — {industry.title()} in {city.title()} | {date.today().strftime('%d %B %Y')}",
-        )
-    except Exception as e:
-        print(f"❌ WhatsApp document failed for {whatsapp_no}: {type(e).__name__}: {e}")
-        raise
+        # ── Send Excel attachment ─────────────────────────────────────────
+        try:
+            send_document(
+                whatsapp_no,
+                excel_path,
+                caption=f"📎 Full lead report — {industry.title()} in {city.title()} | {date.today().strftime('%d %B %Y')}",
+            )
+        except Exception as e:
+            print(f"❌ WhatsApp document failed for {whatsapp_no}: {type(e).__name__}: {e}")
+            raise
 
     # ── Persist to DB ─────────────────────────────────────────────────────
     try:

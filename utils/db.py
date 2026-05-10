@@ -22,6 +22,7 @@ def run_migrations():
     """Create all tables if they don't exist."""
     with get_conn() as conn:
         with conn.cursor() as cur:
+            # ── Core WhatsApp tables ──────────────────────────────────────────
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS clients (
                     id                  TEXT PRIMARY KEY,
@@ -53,6 +54,46 @@ def run_migrations():
                     UNIQUE(client_id, place_id)
                 );
             """)
+
+            # ── Dashboard extensions to leads_history ─────────────────────────
+            cur.execute("""
+                ALTER TABLE leads_history
+                    ADD COLUMN IF NOT EXISTS status     VARCHAR(20) DEFAULT 'new',
+                    ADD COLUMN IF NOT EXISTS notes      TEXT,
+                    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+            """)
+
+            # ── Dashboard tables ──────────────────────────────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS agency_clients (
+                    id             SERIAL PRIMARY KEY,
+                    name           VARCHAR(255) NOT NULL,
+                    contact_email  VARCHAR(255),
+                    contact_phone  VARCHAR(50),
+                    monthly_fee    NUMERIC(10,2),
+                    payment_status VARCHAR(20) DEFAULT 'pending',
+                    started_at     DATE,
+                    notes          TEXT,
+                    created_at     TIMESTAMPTZ DEFAULT NOW()
+                );
+
+                CREATE TABLE IF NOT EXISTS client_services (
+                    id               SERIAL PRIMARY KEY,
+                    agency_client_id INTEGER REFERENCES agency_clients(id) ON DELETE CASCADE,
+                    service_type     VARCHAR(50),
+                    status           VARCHAR(20) DEFAULT 'not_started',
+                    updated_at       TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(agency_client_id, service_type)
+                );
+            """)
+
+            # ── Seed dashboard system client ──────────────────────────────────
+            cur.execute("""
+                INSERT INTO clients (id, name, whatsapp_number)
+                VALUES ('dashboard', 'Dashboard', 'dashboard')
+                ON CONFLICT DO NOTHING;
+            """)
+
     print("✅ Database migrations complete.")
 
 

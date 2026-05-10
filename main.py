@@ -1,11 +1,12 @@
 import asyncio
 import logging
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import PlainTextResponse
+from fastapi.middleware.cors import CORSMiddleware
 from concurrent.futures import ThreadPoolExecutor
 
-from config import WHATSAPP_VERIFY_TOKEN, validate_config
-from utils.db import run_migrations, get_client_by_whatsapp, create_client, has_used_daily_request, save_request, mark_request_failed
+from config import WHATSAPP_VERIFY_TOKEN, CORS_ORIGINS, validate_config
+from utils.db import run_migrations, get_conn, get_client_by_whatsapp, create_client, has_used_daily_request, save_request, mark_request_failed
 from utils.whatsapp import (
     parse_incoming,
     parse_lead_request,
@@ -16,11 +17,25 @@ from utils.whatsapp import (
     PROCESSING_MSG,
 )
 from pipeline import run_pipeline
+from routers import leads, clients, analytics, scrape as scrape_router
 
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="LeadGen Pro")
 executor = ThreadPoolExecutor(max_workers=4)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
+    allow_headers=["Content-Type", "X-API-Key"],
+)
+
+app.include_router(leads.router)
+app.include_router(clients.router)
+app.include_router(analytics.router)
+app.include_router(scrape_router.router)
 
 
 @app.on_event("startup")
@@ -125,4 +140,10 @@ async def receive_message(request: Request):
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    try:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+        return {"status": "healthy", "database": "ok"}
+    except Exception:
+        raise HTTPException(status_code=503, detail="Database unavailable")

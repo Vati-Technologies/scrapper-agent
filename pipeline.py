@@ -31,6 +31,7 @@ class LeadGenState(TypedDict):
     # Output
     excel_path:             str
     delivery_status:        str
+    skip_whatsapp:          bool
 
     # Error accumulator
     errors: Annotated[list, add]
@@ -79,6 +80,7 @@ def run_pipeline(
     request_id: int,
     star_min: float | None = None,
     star_max: float | None = None,
+    skip_whatsapp: bool = False,
 ) -> dict:
     initial_state = {
         "client_id":            client_id,
@@ -94,6 +96,7 @@ def run_pipeline(
         "analyzed_businesses":  [],
         "excel_path":           "",
         "delivery_status":      "",
+        "skip_whatsapp":        skip_whatsapp,
         "errors":               [],
     }
 

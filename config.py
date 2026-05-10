@@ -16,6 +16,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 MAX_BUSINESSES = int(os.getenv("MAX_BUSINESSES", 20))
 MIN_BUSINESSES = int(os.getenv("MIN_BUSINESSES", 10))
 
+CORS_ORIGINS      = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+DASHBOARD_API_KEY = os.getenv("DASHBOARD_API_KEY")
+
 # Validate required vars on startup
 REQUIRED = [
     "GEMINI_API_KEY",
@@ -25,6 +28,7 @@ REQUIRED = [
     "WHATSAPP_PHONE_NUMBER_ID",
     "WHATSAPP_VERIFY_TOKEN",
     "DATABASE_URL",
+    "DASHBOARD_API_KEY",
 ]
 
 def validate_config():
