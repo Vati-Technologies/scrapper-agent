@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from pipeline import run_pipeline
 from utils.auth import require_auth
 from utils import dashboard_db
+from config import DASHBOARD_DAILY_SCRAPE_LIMIT
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/dashboard/scrape", tags=["scrape"])
@@ -32,6 +33,13 @@ class ScrapeRequest(BaseModel):
 async def trigger_scrape(body: ScrapeRequest, _=Depends(require_auth)):
     if _scrape_state["running"]:
         raise HTTPException(status_code=409, detail="A scrape run is already in progress")
+
+    scrapes_today = dashboard_db.count_dashboard_scrapes_today()
+    if scrapes_today >= DASHBOARD_DAILY_SCRAPE_LIMIT:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily scrape limit reached ({DASHBOARD_DAILY_SCRAPE_LIMIT}/day). Resets at midnight.",
+        )
 
     _scrape_state.update(running=True, last_status="running", industry=body.industry, city=body.city)
 

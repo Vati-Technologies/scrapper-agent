@@ -16,8 +16,9 @@ DATABASE_URL = os.getenv("DATABASE_URL")
 MAX_BUSINESSES = int(os.getenv("MAX_BUSINESSES", 20))
 MIN_BUSINESSES = int(os.getenv("MIN_BUSINESSES", 10))
 
-CORS_ORIGINS      = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
-DASHBOARD_API_KEY = os.getenv("DASHBOARD_API_KEY")
+CORS_ORIGINS               = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+DASHBOARD_API_KEY          = os.getenv("DASHBOARD_API_KEY")
+DASHBOARD_DAILY_SCRAPE_LIMIT = int(os.getenv("DASHBOARD_DAILY_SCRAPE_LIMIT", 3))
 
 # Validate required vars on startup
 REQUIRED = [

@@ -48,6 +48,19 @@ def update_lead(lead_id: int, status: str | None, notes: str | None) -> dict:
 
 # ── Dashboard scrape requests ─────────────────────────────────────────────────
 
+def count_dashboard_scrapes_today() -> int:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT COUNT(*) FROM daily_requests
+                WHERE client_id = %s AND request_date = CURRENT_DATE
+                """,
+                (DASHBOARD_CLIENT_ID,),
+            )
+            return cur.fetchone()[0]
+
+
 def save_dashboard_request(industry: str, city: str) -> int:
     """Insert or overwrite today's dashboard scrape record — no daily limit enforced."""
     with get_conn() as conn:
