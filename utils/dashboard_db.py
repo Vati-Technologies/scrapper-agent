@@ -1,5 +1,16 @@
+import json
 import psycopg2.extras
 from utils.db import get_conn
+
+
+def _parse_brief(row: dict) -> dict:
+    """Parse the brief TEXT column into a dict if present."""
+    if row.get("brief") and isinstance(row["brief"], str):
+        try:
+            row["brief"] = json.loads(row["brief"])
+        except (json.JSONDecodeError, ValueError):
+            row["brief"] = None
+    return row
 
 DASHBOARD_CLIENT_ID = "dashboard"
 
@@ -19,14 +30,40 @@ def get_all_leads(status: str | None = None, score: str | None = None) -> list:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
                 f"""
-                SELECT id, business_name, score, status, notes, sent_at, updated_at
+                SELECT id, business_name, score, status, notes, sent_at, updated_at,
+                       website, city, rating, category, praise, complaints, brief
                 FROM leads_history
                 {where}
                 ORDER BY sent_at DESC, id DESC
                 """,
                 params,
             )
-            return [dict(r) for r in cur.fetchall()]
+            return [_parse_brief(dict(r)) for r in cur.fetchall()]
+
+
+def get_lead_by_id(lead_id: int) -> dict | None:
+    with get_conn() as conn:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                """
+                SELECT id, business_name, score, status, notes, sent_at, updated_at,
+                       website, city, rating, category, praise, complaints, brief
+                FROM leads_history
+                WHERE id = %s
+                """,
+                (lead_id,),
+            )
+            row = cur.fetchone()
+            return _parse_brief(dict(row)) if row else None
+
+
+def save_lead_brief(lead_id: int, brief_json: str):
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE leads_history SET brief = %s WHERE id = %s",
+                (brief_json, lead_id),
+            )
 
 
 def update_lead(lead_id: int, status: str | None, notes: str | None) -> dict:

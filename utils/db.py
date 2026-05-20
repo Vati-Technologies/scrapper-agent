@@ -60,7 +60,14 @@ def run_migrations():
                 ALTER TABLE leads_history
                     ADD COLUMN IF NOT EXISTS status     VARCHAR(20) DEFAULT 'new',
                     ADD COLUMN IF NOT EXISTS notes      TEXT,
-                    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+                    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ,
+                    ADD COLUMN IF NOT EXISTS brief      TEXT,
+                    ADD COLUMN IF NOT EXISTS website    TEXT,
+                    ADD COLUMN IF NOT EXISTS city       TEXT,
+                    ADD COLUMN IF NOT EXISTS rating     NUMERIC(3,1),
+                    ADD COLUMN IF NOT EXISTS category   TEXT,
+                    ADD COLUMN IF NOT EXISTS praise     TEXT,
+                    ADD COLUMN IF NOT EXISTS complaints TEXT;
             """)
 
             # ── Dashboard tables ──────────────────────────────────────────────
@@ -188,15 +195,28 @@ def get_sent_place_ids(client_id: str) -> set:
             return {row[0] for row in cur.fetchall()}
 
 
-def save_leads(client_id: str, businesses: list):
+def save_leads(client_id: str, businesses: list, city: str | None = None):
     with get_conn() as conn:
         with conn.cursor() as cur:
             for b in businesses:
                 cur.execute(
                     """
-                    INSERT INTO leads_history (client_id, place_id, business_name, score)
-                    VALUES (%s, %s, %s, %s)
+                    INSERT INTO leads_history
+                        (client_id, place_id, business_name, score,
+                         website, city, rating, category, praise, complaints)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     ON CONFLICT (client_id, place_id) DO NOTHING
                     """,
-                    (client_id, b["place_id"], b["name"], b.get("score", "UNKNOWN"))
+                    (
+                        client_id,
+                        b["place_id"],
+                        b["name"],
+                        b.get("score", "UNKNOWN"),
+                        b.get("website") or None,
+                        b.get("city") or city or None,
+                        b.get("rating") or None,
+                        b.get("category") or None,
+                        b.get("praise") or None,
+                        b.get("complaints") or None,
+                    )
                 )

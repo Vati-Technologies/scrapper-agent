@@ -39,7 +39,7 @@ def deliver_node(state: dict) -> dict:
 
     # ── Persist to DB ─────────────────────────────────────────────────────
     try:
-        save_leads(client_id, businesses)
+        save_leads(client_id, businesses, city=city)
         mark_request_complete(request_id)
     except Exception as e:
         print(f"❌ DB persist failed after delivery: {type(e).__name__}: {e}")
