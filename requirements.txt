@@ -3,7 +3,7 @@ langgraph==1.1.2
 langchain-core==1.2.19
 
 # LLM
-google-genai==1.68.0
+groq==0.13.1
 
 # Scraping
 httpx==0.28.1

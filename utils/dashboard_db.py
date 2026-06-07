@@ -2,6 +2,15 @@ import json
 import psycopg2.extras
 from utils.db import get_conn
 
+
+def _parse_brief(row: dict) -> dict:
+    if row.get("brief") and isinstance(row["brief"], str):
+        try:
+            row["brief"] = json.loads(row["brief"])
+        except (json.JSONDecodeError, ValueError):
+            row["brief"] = None
+    return row
+
 DASHBOARD_CLIENT_ID = "dashboard"
 
 
@@ -28,10 +37,10 @@ def get_all_leads(status: str | None = None, score: str | None = None) -> list:
                 """,
                 params,
             )
-            return [dict(r) for r in cur.fetchall()]
+            return [_parse_brief(dict(r)) for r in cur.fetchall()]
 
 
-def get_lead(lead_id: int) -> dict | None:
+def get_lead_by_id(lead_id: int) -> dict | None:
     with get_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute(
@@ -44,19 +53,15 @@ def get_lead(lead_id: int) -> dict | None:
                 (lead_id,),
             )
             row = cur.fetchone()
-            return dict(row) if row else None
+            return _parse_brief(dict(row)) if row else None
 
 
-def save_lead_brief(lead_id: int, brief: dict):
+def save_lead_brief(lead_id: int, brief_json: str):
     with get_conn() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                """
-                UPDATE leads_history
-                SET brief = %s::jsonb, updated_at = NOW()
-                WHERE id = %s
-                """,
-                (json.dumps(brief), lead_id),
+                "UPDATE leads_history SET brief = %s WHERE id = %s",
+                (brief_json, lead_id),
             )
 
 

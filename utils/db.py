@@ -63,13 +63,13 @@ def run_migrations():
                     ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ,
                     ADD COLUMN IF NOT EXISTS phone      VARCHAR(50),
                     ADD COLUMN IF NOT EXISTS email      VARCHAR(255),
+                    ADD COLUMN IF NOT EXISTS brief      TEXT,
                     ADD COLUMN IF NOT EXISTS website    TEXT,
                     ADD COLUMN IF NOT EXISTS city       TEXT,
                     ADD COLUMN IF NOT EXISTS rating     NUMERIC(3,1),
                     ADD COLUMN IF NOT EXISTS category   TEXT,
                     ADD COLUMN IF NOT EXISTS praise     TEXT,
-                    ADD COLUMN IF NOT EXISTS complaints TEXT,
-                    ADD COLUMN IF NOT EXISTS brief      JSONB;
+                    ADD COLUMN IF NOT EXISTS complaints TEXT;
             """)
 
             # ── Dashboard tables ──────────────────────────────────────────────

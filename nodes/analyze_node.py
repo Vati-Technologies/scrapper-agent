@@ -2,17 +2,17 @@ import re
 import json
 import threading
 import concurrent.futures
-from google import genai
-from config import GEMINI_API_KEY
+from groq import Groq
+from config import GROQ_API_KEY
 
-_MODEL_NAME = "gemini-1.5-flash"
+_MODEL_NAME = "llama-3.3-70b-versatile"
 _local = threading.local()
 
 
 def _get_client():
-    """Return a thread-local Gemini client so threads don't share one instance."""
+    """Return a thread-local Groq client so threads don't share one instance."""
     if not hasattr(_local, "client"):
-        _local.client = genai.Client(api_key=GEMINI_API_KEY)
+        _local.client = Groq(api_key=GROQ_API_KEY)
     return _local.client
 
 
@@ -106,11 +106,12 @@ def _analyze_business(business: dict) -> dict:
 
     prompt = (
         f"Analyse these customer reviews for {business.get('name', 'this business')} "
-        f"(rated {business.get('rating', 'N/A')}★). "
-        f"Return ONLY a JSON object with exactly two keys:\n"
-        f"  \"praise\":     1-2 sentences on what customers consistently praise.\n"
-        f"  \"complaints\": 1-2 sentences on what customers consistently complain about.\n"
-        f"No markdown, no extra keys, no explanation.\n\n"
+        f"(rated {business.get('rating', 'N/A')}★).\n\n"
+        f"Respond with this exact JSON structure — all values must be quoted strings:\n"
+        f'{{ "praise": "...", "complaints": "..." }}\n\n'
+        f"  praise:     1-2 sentences on what customers consistently praise.\n"
+        f"  complaints: 1-2 sentences on what customers consistently complain about.\n"
+        f"Output valid JSON only. No markdown, no extra keys.\n\n"
         f"Reviews:\n{review_text}"
     )
 
@@ -118,19 +119,24 @@ def _analyze_business(business: dict) -> dict:
     complaints = "Unable to analyze reviews."
 
     try:
-        response = _get_client().models.generate_content(
+        response = _get_client().chat.completions.create(
             model=_MODEL_NAME,
-            contents=prompt,
+            messages=[
+                {"role": "system", "content": "You are a JSON API. Respond only with valid, parseable JSON. Every string value must be enclosed in double quotes."},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.3,
+            response_format={"type": "json_object"},
         )
-        parsed = _parse_json_response(response.text)
+        parsed = _parse_json_response(response.choices[0].message.content)
         if parsed and "praise" in parsed and "complaints" in parsed:
             praise     = parsed["praise"]
             complaints = parsed["complaints"]
             print(f"✅ Analysis for '{business.get('name')}': OK")
         else:
-            print(f"⚠️ Unexpected Gemini response for '{business.get('name')}': {response.text[:100]}")
+            print(f"⚠️ Unexpected Groq response for '{business.get('name')}': {response.choices[0].message.content[:100]}")
     except Exception as e:
-        print(f"⚠️ Gemini error for '{business.get('name')}': {type(e).__name__}: {e}")
+        print(f"⚠️ Groq error for '{business.get('name')}': {type(e).__name__}: {e}")
 
     return {
         **business,
