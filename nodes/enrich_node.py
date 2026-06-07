@@ -1,3 +1,4 @@
+import re
 import httpx
 import googlemaps
 from config import GOOGLE_PLACES_API_KEY
@@ -6,6 +7,9 @@ from config import GOOGLE_PLACES_API_KEY
 _gmaps_client = None
 
 SOCIAL_DOMAINS = ["facebook.com", "instagram.com", "twitter.com", "tiktok.com", "x.com"]
+
+_EMAIL_RE = re.compile(r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}')
+_EMAIL_NOISE = {"example", "test", "placeholder", "sentry", "wixpress", "schema", "yourdomain", "domain"}
 
 
 def _get_gmaps():
@@ -68,14 +72,17 @@ def _get_place_details(place_id: str) -> dict:
                   f"API status: {result.get('status')}. "
                   f"Full result keys: {list(place.keys())}")
 
+        missing_social, email = _get_website_info(website)
+
         return {
             "phone":          place.get("formatted_phone_number", ""),
+            "email":          email,
             "website":        website,
             "rating":         place.get("rating"),
             "review_count":   place.get("user_ratings_total", 0),
             "category":       category,
             "photo_count":    len(photos),
-            "missing_social": _is_missing_social(website),
+            "missing_social": missing_social,
             "reviews": [
                 {
                     "author": r.get("author_name", ""),
@@ -88,17 +95,22 @@ def _get_place_details(place_id: str) -> dict:
         }
     except Exception as e:
         print(f"❌ Google Places API error for place_id '{place_id}': {type(e).__name__}: {e}")
-        return {"reviews": [], "photo_count": 0, "missing_social": False}
+        return {"reviews": [], "photo_count": 0, "missing_social": False, "email": None}
 
 
-def _is_missing_social(website: str) -> bool:
-    """Returns True if the website exists but has no social media links."""
+def _get_website_info(website: str) -> tuple[bool, str | None]:
+    """Fetch website once — return (missing_social, email_or_None)."""
     if not website:
-        return False
+        return False, None
     try:
         response = httpx.get(website, timeout=10, follow_redirects=True)
-        html = response.text.lower()
-        found = sum(1 for domain in SOCIAL_DOMAINS if domain in html)
-        return found == 0
+        html_lower = response.text.lower()
+        missing_social = sum(1 for d in SOCIAL_DOMAINS if d in html_lower) == 0
+        candidates = _EMAIL_RE.findall(response.text)
+        email = next(
+            (e for e in candidates if not any(noise in e.lower() for noise in _EMAIL_NOISE)),
+            None,
+        )
+        return missing_social, email
     except Exception:
-        return False
+        return False, None
