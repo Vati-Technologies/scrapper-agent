@@ -1,34 +1,12 @@
 import json
-import re
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from google import genai
-from config import GEMINI_API_KEY
 from utils.auth import require_auth
 from utils import dashboard_db
 from utils.brief import generate_brief
 
 router = APIRouter(prefix="/dashboard/leads", tags=["leads"])
-
-_gemini_client: genai.Client | None = None
-
-
-def _get_gemini() -> genai.Client:
-    global _gemini_client
-    if _gemini_client is None:
-        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
-    return _gemini_client
-
-
-def _parse_json(text: str) -> dict | None:
-    text = text.strip()
-    text = re.sub(r"^```(?:json)?\s*", "", text)
-    text = re.sub(r"\s*```$", "", text)
-    try:
-        return json.loads(text)
-    except (json.JSONDecodeError, ValueError):
-        return None
 
 
 class LeadUpdate(BaseModel):
